@@ -1,0 +1,6 @@
+@PLCDataCollector_HostAddress = http://localhost:5153
+
+GET {{PLCDataCollector_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
