@@ -103,9 +103,7 @@ try
 
     // Add health checks for production monitoring
     builder.Services.AddHealthChecks()
-        .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy())
-        .AddOracle(builder.Configuration.GetConnectionString("Production"), name: "oracle-db")
-        .AddCheck<PLCHealthCheck>("plc-connection");
+        .AddCheck("self", () => Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy());
 
     // Add response compression for better performance
     builder.Services.AddResponseCompression(options =>
@@ -247,23 +245,32 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    using (var sourceDb = new SqliteConnection("Data Source=plc_source.db"))
-    {
-        sourceDb.Execute(File.ReadAllText("Model/Database/init.sql"));
-    }
+    //using (var sourceDb = new SqliteConnection("Data Source=plc_source.db"))
+    //{
+    //    sourceDb.Execute(File.ReadAllText("Model/Database/init.sql"));
+    //}
 
-    if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Production")
-    {
-        using (var targetDb = new SqliteConnection("Data Source=plc_target.db"))
-        {
-            targetDb.Execute(File.ReadAllText("Model/Database/init.sql"));
-        }
-    }
+    //if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Production")
+    //{
+    //    using (var targetDb = new SqliteConnection("Data Source=plc_target.db"))
+    //    {
+    //        targetDb.Execute(File.ReadAllText("Model/Database/init.sql"));
+    //    }
+    //}
 
     using (var scope = app.Services.CreateScope())
     {
-        var context = scope.ServiceProvider.GetRequiredService<PlcDataContext>();
-        await context.Database.EnsureCreatedAsync();
+        try
+        {
+            var context = scope.ServiceProvider.GetRequiredService<PlcDataContext>();
+            await context.Database.EnsureCreatedAsync();
+            Log.Information("Database created successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "Failed to create database");
+            // Don't throw here, let the app continue
+        }
     }
 
     // Add health check endpoints

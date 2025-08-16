@@ -1,4 +1,5 @@
 ﻿using FluentValidation;
+using PLCDataCollector.Model.Classes;
 using System.Text.Json;
 
 namespace PLCDataCollector.Model.Validation
@@ -49,6 +50,26 @@ namespace PLCDataCollector.Model.Validation
             {
                 return false;
             }
+        }
+    }
+    public class NewPlcDataValidator
+    {
+        public bool ValidatePlcData(PlcData data)
+        {
+            if (data == null) return false;
+            if (string.IsNullOrEmpty(data.LineId)) return false;
+            if (data.Timestamp == default) return false;
+
+            return true;
+        }
+
+        public bool ValidateProductionData(ProductionData data)
+        {
+            if (data == null) return false;
+            if (string.IsNullOrEmpty(data.LineId)) return false;
+            if (string.IsNullOrEmpty(data.PartNumber)) return false;
+
+            return true;
         }
     }
 }
