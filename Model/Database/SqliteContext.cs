@@ -1,9 +1,10 @@
 ﻿using Microsoft.Data.Sqlite;
+using PLCDataCollector.Service.Interfaces;
 using System.Data;
 
 namespace PLCDataCollector.Model.Database
 {
-    public class SqliteContext: IDatabaseContext
+    public class SqliteContext: IDatabaseContext, ITargetDatabaseContext
     {
         private readonly string _connectionString;
 

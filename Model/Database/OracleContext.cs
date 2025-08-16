@@ -1,9 +1,10 @@
 ﻿using Oracle.ManagedDataAccess.Client;
+using PLCDataCollector.Service.Interfaces;
 using System.Data;
 
 namespace PLCDataCollector.Model.Database
 {
-    public class OracleContext : IDatabaseContext
+    public class OracleContext : IDatabaseContext, ITargetDatabaseContext
     {
         private readonly string _connectionString;
 

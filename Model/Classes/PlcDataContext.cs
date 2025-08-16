@@ -4,7 +4,7 @@ using PLCDataCollector.Service.Interfaces;
 namespace PLCDataCollector.Model.Classes
 {
     
-    public class PlcDataContext : DbContext
+    public class PlcDataContext : DbContext, ISourceDatabaseContext
     {
 
         public PlcDataContext(DbContextOptions<PlcDataContext> options)
@@ -26,9 +26,19 @@ namespace PLCDataCollector.Model.Classes
         public DbSet<QualityChecks> QualityChecks { get; set; }
         public DbSet<MaintenanceLogs> MaintenanceLogs { get; set; }
 
+        // Update the OnModelCreating method in PlcDataContext.cs
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            // Configure ShiftConfiguration as owned entity
+            modelBuilder.Entity<LineDetail>()
+                .OwnsOne(l => l.ShiftConfiguration, sc =>
+                {
+                    sc.OwnsOne(s => s.ShiftA);
+                    sc.OwnsOne(s => s.ShiftB);
+                    sc.OwnsOne(s => s.ShiftC);
+                });
 
             // Configure indexes
             modelBuilder.Entity<PlcData>()
@@ -54,20 +64,22 @@ namespace PLCDataCollector.Model.Classes
                 .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<ConfigurationSetting>()
-    .HasOne(c => c.LineDetail)
-    .WithMany(l => l.ConfigurationSettings)
-    .HasForeignKey(c => c.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(c => c.LineDetail)
+                .WithMany(l => l.ConfigurationSettings)
+                .HasForeignKey(c => c.LineId)
+                .HasPrincipalKey(l => l.LineId);
+
             modelBuilder.Entity<Tag>()
-    .HasOne(t => t.LineDetail)
-    .WithMany(l => l.Tags)
-    .HasForeignKey(t => t.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(t => t.LineDetail)
+                .WithMany(l => l.Tags)
+                .HasForeignKey(t => t.LineId)
+                .HasPrincipalKey(l => l.LineId);
+
             modelBuilder.Entity<AlarmDefinitions>()
-    .HasOne(a => a.LineDetail)
-    .WithMany(l => l.AlarmDefinitions)
-    .HasForeignKey(a => a.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(a => a.LineDetail)
+                .WithMany(l => l.AlarmDefinitions)
+                .HasForeignKey(a => a.LineId)
+                .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<AlarmDefinitions>()
                 .HasOne(a => a.Tag)
@@ -75,9 +87,9 @@ namespace PLCDataCollector.Model.Classes
                 .HasForeignKey(a => a.TagId);
 
             modelBuilder.Entity<AlarmHistory>()
-    .HasOne(h => h.AlarmDefinitions)
-    .WithMany(a => a.AlarmHistories)
-    .HasForeignKey(h => h.AlarmDefinitionId);
+                .HasOne(h => h.AlarmDefinitions)
+                .WithMany(a => a.AlarmHistories)
+                .HasForeignKey(h => h.AlarmDefinitionId);
 
             modelBuilder.Entity<AlarmHistory>()
                 .HasOne(h => h.LineDetail)
@@ -86,9 +98,9 @@ namespace PLCDataCollector.Model.Classes
                 .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<TagHistory>()
-    .HasOne(th => th.Tag)
-    .WithMany(t => t.TagHistories)
-    .HasForeignKey(th => th.TagId);
+                .HasOne(th => th.Tag)
+                .WithMany(t => t.TagHistories)
+                .HasForeignKey(th => th.TagId);
 
             modelBuilder.Entity<TagHistory>()
                 .HasOne(th => th.LineDetail)
@@ -97,16 +109,16 @@ namespace PLCDataCollector.Model.Classes
                 .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<Shifts>()
-    .HasOne(s => s.LineDetail)
-    .WithMany(l => l.Shifts)
-    .HasForeignKey(s => s.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(s => s.LineDetail)
+                .WithMany(l => l.Shifts)
+                .HasForeignKey(s => s.LineId)
+                .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<ProductionSchedule>()
-    .HasOne(ps => ps.LineDetail)
-    .WithMany(l => l.ProductionSchedules)
-    .HasForeignKey(ps => ps.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(ps => ps.LineDetail)
+                .WithMany(l => l.ProductionSchedules)
+                .HasForeignKey(ps => ps.LineId)
+                .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<ProductionSchedule>()
                 .HasOne(ps => ps.Shift)
@@ -114,10 +126,10 @@ namespace PLCDataCollector.Model.Classes
                 .HasForeignKey(ps => ps.ShiftId);
 
             modelBuilder.Entity<ProductionData>()
-    .HasOne(pd => pd.LineDetail)
-    .WithMany(l => l.ProductionData)
-    .HasForeignKey(pd => pd.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(pd => pd.LineDetail)
+                .WithMany(l => l.ProductionData)
+                .HasForeignKey(pd => pd.LineId)
+                .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<ProductionData>()
                 .HasOne(pd => pd.Schedule)
@@ -130,22 +142,21 @@ namespace PLCDataCollector.Model.Classes
                 .HasForeignKey(pd => pd.ShiftId);
 
             modelBuilder.Entity<Downtime>()
-    .HasOne(d => d.LineDetail)
-    .WithMany(l => l.Downtimes)
-    .HasForeignKey(d => d.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(d => d.LineDetail)
+                .WithMany(l => l.Downtimes)
+                .HasForeignKey(d => d.LineId)
+                .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<Downtime>()
                 .HasOne(d => d.Shifts)
                 .WithMany(s => s.Downtimes)
                 .HasForeignKey(d => d.ShiftId);
 
-
             modelBuilder.Entity<QualityChecks>()
-    .HasOne(q => q.LineDetail)
-    .WithMany(l => l.QualityChecks)
-    .HasForeignKey(q => q.LineId)
-    .HasPrincipalKey(l => l.LineId);
+                .HasOne(q => q.LineDetail)
+                .WithMany(l => l.QualityChecks)
+                .HasForeignKey(q => q.LineId)
+                .HasPrincipalKey(l => l.LineId);
 
             modelBuilder.Entity<QualityChecks>()
                 .HasOne(q => q.ProductionData)
@@ -153,16 +164,10 @@ namespace PLCDataCollector.Model.Classes
                 .HasForeignKey(q => q.ProductionDataId);
 
             modelBuilder.Entity<MaintenanceLogs>()
-    .HasOne(m => m.LineDetail)
-    .WithMany(l => l.MaintenanceLogs)
-    .HasForeignKey(m => m.LineId)
-    .HasPrincipalKey(l => l.LineId);
-
-
-
-
-
-            // Add more relationship configurations...
+                .HasOne(m => m.LineDetail)
+                .WithMany(l => l.MaintenanceLogs)
+                .HasForeignKey(m => m.LineId)
+                .HasPrincipalKey(l => l.LineId);
         }
     }
 }

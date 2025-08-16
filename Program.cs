@@ -119,7 +119,45 @@ try
     // Add HTTP client for external API calls
     builder.Services.AddHttpClient();
 
-    // Register your services
+    // Replace the service registration section in Program.cs (around lines 95-120)
+
+    // Register database contexts first
+    builder.Services.AddDbContext<PlcDataContext>(options =>
+    {
+        options.UseSqlite(builder.Configuration.GetConnectionString("SourceDatabase"));
+    });
+
+
+    // Register database contexts for dependency injection
+    builder.Services.AddScoped<IDatabaseContext>(provider =>
+    {
+        var connectionString = builder.Configuration.GetConnectionString("SourceDatabase");
+        return new SqliteContext(connectionString);
+    });
+
+    builder.Services.AddScoped<ISourceDatabaseContext>(provider =>
+    {
+        return provider.GetRequiredService<PlcDataContext>();
+    });
+
+    builder.Services.AddScoped<ITargetDatabaseContext>(provider =>
+    {
+        var env = builder.Configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Development";
+        var dbType = builder.Configuration.GetValue<string>($"DatabaseSettings:TargetType:{env}");
+
+        if (dbType?.ToUpper() == "ORACLE")
+        {
+            var oracleConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:TargetDatabase:{env}");
+            return new OracleContext(oracleConnectionString);
+        }
+        else
+        {
+            var sqliteConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:TargetDatabase:{env}");
+            return new SqliteContext(sqliteConnectionString);
+        }
+    });
+
+    // Register your services (make sure all interfaces have implementations)
     builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
     builder.Services.AddScoped<IProductionService, ProductionService>();
     builder.Services.AddScoped<IPLCService, PLCService>();
@@ -130,23 +168,17 @@ try
     builder.Services.AddSingleton<IWebSocketService, WebSocketService>();
     builder.Services.AddScoped<IPlcDataService, PlcDataService>();
     builder.Services.AddScoped<PlcDataValidator>();
-    builder.Services.AddScoped<DatabaseMigrationService>();
 
-    builder.Services.AddDbContext<PlcDataContext>(options =>
-    {
-        options.UseSqlite(builder.Configuration.GetConnectionString("SourceDatabase"));
-    });
+    // Comment out or remove DatabaseMigrationService temporarily to isolate the issue
+    // builder.Services.AddScoped<DatabaseMigrationService>();
 
-
-
-    // Add background services for real-time data collection
+    // Add background services
     builder.Services.AddHostedService<PLCDataCollectorBackgroundService>();
     builder.Services.AddHostedService<HealthCheckBackgroundService>();
     builder.Services.Configure<DataSyncSettings>(
-    builder.Configuration.GetSection("DataSync"));
+        builder.Configuration.GetSection("DataSync"));
 
     builder.Services.AddHostedService<DataSyncBackgroundService>();
-
     // Configure rate limiting
     builder.Services.AddRateLimiter(options =>
     {
@@ -230,8 +262,8 @@ try
 
     using (var scope = app.Services.CreateScope())
     {
-        var migrationService = scope.ServiceProvider.GetRequiredService<DatabaseMigrationService>();
-        await migrationService.MigrateAsync();
+        var context = scope.ServiceProvider.GetRequiredService<PlcDataContext>();
+        await context.Database.EnsureCreatedAsync();
     }
 
     // Add health check endpoints
