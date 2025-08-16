@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Caching.Memory;
-using PLCDataCollector.Model;
+using PLCDataCollector.Model.Classes;
 using PLCDataCollector.Service.Interfaces;
 
 namespace PLCDataCollector.Service.Implementation

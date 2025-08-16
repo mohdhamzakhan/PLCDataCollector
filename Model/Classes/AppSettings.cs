@@ -1,4 +1,8 @@
-﻿namespace PLCDataCollector.Model
+﻿using Azure;
+using System.ComponentModel.DataAnnotations;
+using System.Configuration;
+
+namespace PLCDataCollector.Model.Classes
 {
     public class AppSettings
     {
@@ -65,15 +69,70 @@
         public string Production { get; set; }
     }
 
-    public class LineDetail
+
+    public class ConfigurationSetting
     {
-        public string LineName { get; set; }
-        public int LineId { get; set; }
-        public string LineType { get; set; }
-        public PLCConfig PLC { get; set; } = new();
-        public DataLocationConfig Data_Location { get; set; } = new();
-        public ShiftConfigurationDetail ShiftConfiguration { get; set; } = new();
-        public LineGraphSettings GraphSettings { get; set; } = new();
+        public int Id { get; set; }
+
+        [Required]
+        public string LineId { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string SettingKey { get; set; }
+
+        [Required]
+        public string SettingValue { get; set; }
+
+        [Required]
+        [MaxLength(50)]
+        public string DataType { get; set; }
+
+        [MaxLength(500)]
+        public string Description { get; set; }
+
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+        // Navigation property
+        public virtual LineDetail LineDetail { get; set; }
+    }
+
+    public class Tag
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string LineId { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string TagName { get; set; }
+
+        [Required]
+        [MaxLength(100)]
+        public string Address { get; set; }
+
+        [Required]
+        [MaxLength(50)]
+        public string DataType { get; set; }
+
+        [MaxLength(500)]
+        public string Description { get; set; }
+
+        public bool IsActive { get; set; } = true;
+
+        public int ScanRate { get; set; } = 1000;
+
+        public DateTime CreatedAt { get; set; } = DateTime.Now;
+
+        public DateTime UpdatedAt { get; set; } = DateTime.Now;
+
+        // Navigation properties
+        public virtual LineDetail LineDetail { get; set; }
+        public virtual ICollection<AlarmDefinitions> AlarmDefinitions { get; set; } = new List<AlarmDefinitions>();
+        public virtual ICollection<TagHistory> TagHistories { get; set; } = new List<TagHistory>();
     }
 
     public class PLCConfig
@@ -93,6 +152,8 @@
         public int Part { get; set; }
         public int Time { get; set; }
         public int Part_Number { get; set; }
+
+        public virtual LineDetail LineDetail { get; set; }
     }
 
     public class ShiftConfigurationDetail
@@ -100,6 +161,8 @@
         public ShiftDetail ShiftA { get; set; } = new();
         public ShiftDetail ShiftB { get; set; } = new();
         public ShiftDetail ShiftC { get; set; } = new();
+
+        public LineDetail LineDetail { get; set; }
     }
 
     public class ShiftDetail

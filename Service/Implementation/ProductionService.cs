@@ -1,4 +1,4 @@
-﻿using PLCDataCollector.Model;
+﻿using PLCDataCollector.Model.Classes;
 using PLCDataCollector.Service.Interfaces;
 
 namespace PLCDataCollector.Service.Implementation
@@ -149,10 +149,10 @@ namespace PLCDataCollector.Service.Implementation
             return (int)(minutesElapsed / 60.0 * 60);
         }
 
-        private double CalculateEfficiency(ProductionData data)
+        private decimal CalculateEfficiency(ProductionData data)
         {
             if (data.PlannedCount == 0) return 0;
-            return Math.Round((double)data.ActualCount / data.PlannedCount * 100, 2);
+            return Math.Round((decimal)data.ActualCount / data.PlannedCount * 100, 2);
         }
 
         private List<ProductionAlert> GenerateAlerts(ProductionData data, int plannedCount)

@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using PLCDataCollector.Model;
+using PLCDataCollector.Model.Classes;
 using PLCDataCollector.Service.Interfaces;
 
 namespace PLCDataCollector.Controllers

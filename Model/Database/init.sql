@@ -1,0 +1,11 @@
+﻿-- SQLite Source Database Schema
+CREATE TABLE IF NOT EXISTS PlcData (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    LineId TEXT NOT NULL,
+    Data TEXT NOT NULL,
+    SyncStatus INTEGER DEFAULT 0,
+    Timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_plcdata_sync 
+ON PlcData(LineId, SyncStatus);

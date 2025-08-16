@@ -1,4 +1,4 @@
-﻿using PLCDataCollector.Model;
+﻿using PLCDataCollector.Model.Classes;
 
 namespace PLCDataCollector.Service.Interfaces
 {

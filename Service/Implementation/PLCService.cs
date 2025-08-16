@@ -1,4 +1,4 @@
-﻿using PLCDataCollector.Model;
+﻿using PLCDataCollector.Model.Classes;
 using PLCDataCollector.Service.Interfaces;
 
 namespace PLCDataCollector.Service.Implementation
@@ -25,7 +25,7 @@ namespace PLCDataCollector.Service.Implementation
                 }
 
                 // Read from PLC (FTP in this case)
-                var rawData = await ReadFromFTPAsync(lineDetail.PLC);
+                var rawData = await ReadFromFTPAsync(lineDetail.PLCConfig);
 
                 return new PLCData
                 {
@@ -66,22 +66,30 @@ namespace PLCDataCollector.Service.Implementation
 
         private async Task<Dictionary<string, object>> ReadFromFTPAsync(PLCConfig plcConfig)
         {
-            // Simulate FTP read - replace with actual FTP implementation
-            await Task.Delay(100); // Simulate network delay
-
-            // Generate sample data based on current time for demonstration
-            var random = new Random();
-            return new Dictionary<string, object>
+            try
             {
-                ["ProductionCount"] = random.Next(1, 1000),
-                ["PartNumber"] = $"PART{random.Next(1000, 9999)}",
-                ["CycleTime"] = random.Next(10, 30),
-                ["Status"] = random.Next(0, 2), // 0 = stopped, 1 = running
-                ["Timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-            };
+                // Simulate FTP read - replace with actual FTP implementation
+                await Task.Delay(100); // Simulate network delay
+
+                // Generate sample data based on current time for demonstration
+                var random = new Random();
+                return new Dictionary<string, object>
+                {
+                    ["ProductionCount"] = random.Next(1, 1000),
+                    ["PartNumber"] = $"PART{random.Next(1000, 9999)}",
+                    ["CycleTime"] = random.Next(10, 30),
+                    ["Status"] = random.Next(0, 2), // 0 = stopped, 1 = running
+                    ["Timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read from FTP for PLC {IpAddress}", plcConfig.IP);
+                throw;
+            }
         }
 
-        private int ExtractCount(Dictionary<string, object> rawData, DataLocationConfig location)
+        private int ExtractCount(Dictionary<string, object> rawData, string location)
         {
             if (rawData.TryGetValue("ProductionCount", out var count))
             {
@@ -90,7 +98,7 @@ namespace PLCDataCollector.Service.Implementation
             return 0;
         }
 
-        private string ExtractPartNumber(Dictionary<string, object> rawData, DataLocationConfig location)
+        private string ExtractPartNumber(Dictionary<string, object> rawData, string location)
         {
             if (rawData.TryGetValue("PartNumber", out var partNumber))
             {
@@ -99,13 +107,13 @@ namespace PLCDataCollector.Service.Implementation
             return "UNKNOWN";
         }
 
-        private int ExtractCycleTime(Dictionary<string, object> rawData, DataLocationConfig location)
+        private int ExtractCycleTime(Dictionary<string, object> rawData, string location)
         {
             if (rawData.TryGetValue("CycleTime", out var cycleTime))
             {
                 return Convert.ToInt32(cycleTime);
             }
-            return location.Time; // Default from configuration
+            return 0; // Default from configuration
         }
 
         private bool DetermineRunningStatus(Dictionary<string, object> rawData)

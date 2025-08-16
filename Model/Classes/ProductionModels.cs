@@ -1,18 +1,57 @@
-﻿namespace PLCDataCollector.Model
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace PLCDataCollector.Model.Classes
 {
     public class ProductionData
     {
+        [Key]
         public int Id { get; set; }
+
+        [Required]
         public string LineId { get; set; }
-        public DateTime Timestamp { get; set; }
-        public int ActualCount { get; set; }
-        public int PlannedCount { get; set; }
-        public int CycleTime { get; set; } // in seconds
+
+        public int? ScheduleId { get; set; }
+
+        [Required]
+        public int ShiftId { get; set; }
+
+        [Required]
+        public string ProductCode { get; set; }
+
+        [Required]
         public string PartNumber { get; set; }
+
+        [Required]
         public string ShiftName { get; set; }
-        public double Efficiency { get; set; }
+
+        [Required]
+        public int ActualCount { get; set; }
+
+        [Required]
+        public int PlannedCount { get; set; }
+
+        [Required]
+        public int GoodQuantity { get; set; }
+
+        [Required]
+        public int ScrapQuantity { get; set; }
+
+        [Required]
+        [Column(TypeName = "nvarchar(50)")]
         public ProductionStatus Status { get; set; }
-        public string? Remarks { get; set; }
+
+        public decimal CycleTime { get; set; }
+
+        public decimal Efficiency { get; set; }
+
+        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+
+        // Navigation properties
+        public LineDetail LineDetail { get; set; }
+        public Shifts Shift { get; set; }
+        public virtual ProductionSchedule Schedule { get; set; }
+        public ICollection<QualityChecks> QualityChecks { get; set; }
     }
 
     public class ProductionPlan
@@ -35,7 +74,7 @@
         public TimeSpan TimeRemaining { get; set; }
         public int ActualProduction { get; set; }
         public int PlannedProduction { get; set; }
-        public double EfficiencyPercentage { get; set; }
+        public decimal EfficiencyPercentage { get; set; }
         public ProductionStatus Status { get; set; }
         public List<ProductionAlert> Alerts { get; set; } = new();
     }
@@ -59,11 +98,14 @@
     }
     public enum ProductionStatus
     {
-        Running,
         Idle,
-        Break,
+        Running,
+        Stopped,
         Maintenance,
-        Error
+        Error,
+        Completed,
+        Scheduled,
+        Setup
     }
 
     public enum AlertSeverity

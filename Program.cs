@@ -1,7 +1,12 @@
+using Dapper;
 using HealthChecks.UI.Client;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
-using PLCDataCollector.Model;
+using PLCDataCollector.Model.Classes;
+using PLCDataCollector.Model.Database;
+using PLCDataCollector.Model.Validation;
 using PLCDataCollector.Service.Implementation;
 using PLCDataCollector.Service.Interfaces;
 using Serilog;
@@ -123,10 +128,24 @@ try
     builder.Services.AddScoped<IDataParsingService, DataParsingService>();
     builder.Services.AddSingleton<IAlertService, AlertService>();
     builder.Services.AddSingleton<IWebSocketService, WebSocketService>();
+    builder.Services.AddScoped<IPlcDataService, PlcDataService>();
+    builder.Services.AddScoped<PlcDataValidator>();
+    builder.Services.AddScoped<DatabaseMigrationService>();
+
+    builder.Services.AddDbContext<PlcDataContext>(options =>
+    {
+        options.UseSqlite(builder.Configuration.GetConnectionString("SourceDatabase"));
+    });
+
+
 
     // Add background services for real-time data collection
     builder.Services.AddHostedService<PLCDataCollectorBackgroundService>();
     builder.Services.AddHostedService<HealthCheckBackgroundService>();
+    builder.Services.Configure<DataSyncSettings>(
+    builder.Configuration.GetSection("DataSync"));
+
+    builder.Services.AddHostedService<DataSyncBackgroundService>();
 
     // Configure rate limiting
     builder.Services.AddRateLimiter(options =>
@@ -195,6 +214,25 @@ try
     app.UseRateLimiter();
     app.UseAuthentication();
     app.UseAuthorization();
+
+    using (var sourceDb = new SqliteConnection("Data Source=plc_source.db"))
+    {
+        sourceDb.Execute(File.ReadAllText("Model/Database/init.sql"));
+    }
+
+    if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Production")
+    {
+        using (var targetDb = new SqliteConnection("Data Source=plc_target.db"))
+        {
+            targetDb.Execute(File.ReadAllText("Model/Database/init.sql"));
+        }
+    }
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var migrationService = scope.ServiceProvider.GetRequiredService<DatabaseMigrationService>();
+        await migrationService.MigrateAsync();
+    }
 
     // Add health check endpoints
     app.MapHealthChecks("/health", new HealthCheckOptions()

@@ -1,4 +1,4 @@
-﻿using PLCDataCollector.Model;
+﻿using PLCDataCollector.Model.Classes;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;

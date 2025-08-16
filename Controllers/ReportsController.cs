@@ -105,7 +105,7 @@ namespace PLCDataCollector.Controllers
                 while (currentDate <= endDate)
                 {
                     var shifts = new[] { "ShiftA", "ShiftB", "ShiftC" };
-                    var dayEfficiency = new List<double>();
+                    var dayEfficiency = new List<decimal>();
 
                     foreach (var shift in shifts)
                     {
