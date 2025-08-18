@@ -117,20 +117,47 @@ try
     // Add HTTP client for external API calls
     builder.Services.AddHttpClient();
 
-    // Replace the service registration section in Program.cs (around lines 95-120)
+    // Database Configuration - Source can be Oracle OR SQLite, Target is ALWAYS SQLite
+    var env = builder.Configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Development";
+    var sourceDbType = builder.Configuration.GetValue<string>($"DatabaseSettings:SourceType:{env}");
 
-    // Register database contexts first
-    builder.Services.AddDbContext<PlcDataContext>(options =>
+    // Register Source Database Context (Oracle OR SQLite based on environment)
+    if (sourceDbType?.ToUpper() == "ORACLE")
     {
-        options.UseSqlite(builder.Configuration.GetConnectionString("SourceDatabase"));
-    });
-
+        // Use Oracle for source database
+        var oracleConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:SourceDatabase:{env}");
+        builder.Services.AddDbContext<PlcDataContext>(options =>
+        {
+            options.UseOracle(oracleConnectionString);
+        });
+    }
+    else
+    {
+        // Use SQLite for source database (default)
+        var sqliteConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:SourceDatabase:{env}")
+                                    ?? builder.Configuration.GetConnectionString("SourceDatabase")
+                                    ?? "Data Source=plc_source.db";
+        builder.Services.AddDbContext<PlcDataContext>(options =>
+        {
+            options.UseSqlite(sqliteConnectionString);
+        });
+    }
 
     // Register database contexts for dependency injection
     builder.Services.AddScoped<IDatabaseContext>(provider =>
     {
-        var connectionString = builder.Configuration.GetConnectionString("SourceDatabase");
-        return new SqliteContext(connectionString);
+        if (sourceDbType?.ToUpper() == "ORACLE")
+        {
+            var oracleConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:SourceDatabase:{env}");
+            return new OracleContext(oracleConnectionString);
+        }
+        else
+        {
+            var sqliteConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:SourceDatabase:{env}")
+                                        ?? builder.Configuration.GetConnectionString("SourceDatabase")
+                                        ?? "Data Source=plc_source.db";
+            return new SqliteContext(sqliteConnectionString);
+        }
     });
 
     builder.Services.AddScoped<ISourceDatabaseContext>(provider =>
@@ -138,21 +165,12 @@ try
         return provider.GetRequiredService<PlcDataContext>();
     });
 
+    // Target Database is ALWAYS SQLite
     builder.Services.AddScoped<ITargetDatabaseContext>(provider =>
     {
-        var env = builder.Configuration.GetValue<string>("ASPNETCORE_ENVIRONMENT") ?? "Development";
-        var dbType = builder.Configuration.GetValue<string>($"DatabaseSettings:TargetType:{env}");
-
-        if (dbType?.ToUpper() == "ORACLE")
-        {
-            var oracleConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:TargetDatabase:{env}");
-            return new OracleContext(oracleConnectionString);
-        }
-        else
-        {
-            var sqliteConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:TargetDatabase:{env}");
-            return new SqliteContext(sqliteConnectionString);
-        }
+        var sqliteConnectionString = builder.Configuration.GetValue<string>($"ConnectionStrings:TargetDatabase:{env}")
+                                    ?? "Data Source=plc_target.db";
+        return new SqliteContext(sqliteConnectionString);
     });
 
     // Register your services (make sure all interfaces have implementations)
@@ -167,16 +185,13 @@ try
     builder.Services.AddScoped<IPlcDataService, PlcDataService>();
     builder.Services.AddScoped<PlcDataValidator>();
 
-    // Comment out or remove DatabaseMigrationService temporarily to isolate the issue
-    // builder.Services.AddScoped<DatabaseMigrationService>();
-
     // Add background services
     builder.Services.AddHostedService<PLCDataCollectorBackgroundService>();
     builder.Services.AddHostedService<HealthCheckBackgroundService>();
     builder.Services.Configure<DataSyncSettings>(
         builder.Configuration.GetSection("DataSync"));
-
     builder.Services.AddHostedService<DataSyncBackgroundService>();
+
     // Configure rate limiting
     builder.Services.AddRateLimiter(options =>
     {
@@ -245,31 +260,71 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
 
-    //using (var sourceDb = new SqliteConnection("Data Source=plc_source.db"))
-    //{
-    //    sourceDb.Execute(File.ReadAllText("Model/Database/init.sql"));
-    //}
-
-    //if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") != "Production")
-    //{
-    //    using (var targetDb = new SqliteConnection("Data Source=plc_target.db"))
-    //    {
-    //        targetDb.Execute(File.ReadAllText("Model/Database/init.sql"));
-    //    }
-    //}
-
+    // Database Creation Section
     using (var scope = app.Services.CreateScope())
     {
         try
         {
-            var context = scope.ServiceProvider.GetRequiredService<PlcDataContext>();
-            await context.Database.EnsureCreatedAsync();
-            Log.Information("Database created successfully");
+            var currentEnv = app.Environment.EnvironmentName;
+            var currentSourceDbType = builder.Configuration.GetValue<string>($"DatabaseSettings:SourceType:{currentEnv}");
+
+            // 1. Create Source Database (Oracle OR SQLite)
+            Log.Information("Creating source database ({SourceType})...", currentSourceDbType ?? "SQLite");
+            var sourceContext = scope.ServiceProvider.GetRequiredService<PlcDataContext>();
+            await sourceContext.Database.EnsureCreatedAsync();
+            Log.Information("Source database created successfully");
+
+            // 2. Create Target Database (ALWAYS SQLite)
+            Log.Information("Creating target database (SQLite)...");
+            var targetDbContext = scope.ServiceProvider.GetRequiredService<ITargetDatabaseContext>();
+
+            if (targetDbContext.TestConnectionAsync())
+            {
+                using var targetConnection = targetDbContext.CreateConnection();
+                targetConnection.Open();
+
+                // Always use SQLite script for target database
+                string scriptPath = "Model/Database/init.sql";
+
+                if (File.Exists(scriptPath))
+                {
+                    var targetDbScript = await File.ReadAllTextAsync(scriptPath);
+
+                    var statements = targetDbScript.Split(';', StringSplitOptions.RemoveEmptyEntries);
+
+                    foreach (var statement in statements)
+                    {
+                        var trimmedStatement = statement.Trim();
+                        if (!string.IsNullOrEmpty(trimmedStatement))
+                        {
+                            using var command = targetConnection.CreateCommand();
+                            command.CommandText = trimmedStatement;
+                            try
+                            {
+                                command.ExecuteNonQuery();
+                            }
+                            catch (Exception sqlEx)
+                            {
+                                Log.Warning("SQL execution warning: {Message}", sqlEx.Message);
+                            }
+                        }
+                    }
+
+                    Log.Information("Target database (SQLite) created successfully");
+                }
+                else
+                {
+                    Log.Warning("Database script not found: {ScriptPath}", scriptPath);
+                }
+            }
+            else
+            {
+                Log.Error("Cannot connect to target database");
+            }
         }
         catch (Exception ex)
         {
-            Log.Error(ex, "Failed to create database");
-            // Don't throw here, let the app continue
+            Log.Error(ex, "Failed to create databases: {Message}", ex.Message);
         }
     }
 
@@ -292,6 +347,7 @@ try
 
     app.MapControllers();
 
+    Log.Information("Application started successfully");
     app.Run();
 }
 catch (Exception ex)

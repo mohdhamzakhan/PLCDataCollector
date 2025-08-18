@@ -32,7 +32,7 @@ namespace PLCDataCollector.Service.Implementation
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Data Sync Background Service starting at: {time}", DateTimeOffset.UtcNow);
+            _logger.LogInformation("Data Sync Background Service starting at: {time}", DateTimeOffset.Now);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -84,7 +84,7 @@ namespace PLCDataCollector.Service.Implementation
             if (_settings.EnableDetailedLogging)
             {
                 _logger.LogInformation("Starting data sync for line {LineId} at {Time}",
-                    lineId, DateTimeOffset.UtcNow);
+                    lineId, DateTimeOffset.Now);
             }
 
             var unsyncedData = await plcDataService.GetUnsyncedDataAsync(lineId);
@@ -124,11 +124,11 @@ namespace PLCDataCollector.Service.Implementation
                 }
 
                 transaction.Commit();
-                _lastSyncTimes[lineId] = DateTime.UtcNow;
+                _lastSyncTimes[lineId] = DateTime.Now;
 
                 _logger.LogInformation(
                     "Successfully synced {Count} records for line {LineId} at {Time}",
-                    dataList.Count, lineId, DateTime.UtcNow);
+                    dataList.Count, lineId, DateTime.Now);
             }
             catch (Exception)
             {
@@ -185,7 +185,7 @@ namespace PLCDataCollector.Service.Implementation
 
         public override async Task StopAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Data Sync Background Service stopping at: {time}", DateTimeOffset.UtcNow);
+            _logger.LogInformation("Data Sync Background Service stopping at: {time}", DateTimeOffset.Now);
             await base.StopAsync(stoppingToken);
         }
     }

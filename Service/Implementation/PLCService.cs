@@ -79,7 +79,7 @@ namespace PLCDataCollector.Service.Implementation
                     ["PartNumber"] = $"PART{random.Next(1000, 9999)}",
                     ["CycleTime"] = random.Next(10, 30),
                     ["Status"] = random.Next(0, 2), // 0 = stopped, 1 = running
-                    ["Timestamp"] = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    ["Timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
                 };
             }
             catch (Exception ex)

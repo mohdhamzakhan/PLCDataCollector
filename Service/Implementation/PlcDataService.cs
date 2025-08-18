@@ -36,7 +36,7 @@ namespace PLCDataCollector.Service.Implementation
                 {
                     LineId = lineId,
                     Data = System.Text.Json.JsonSerializer.Serialize(data),
-                    Timestamp = DateTime.UtcNow
+                    Timestamp = DateTime.Now
                 };
 
                 await conn.ExecuteAsync(sql, parameters);

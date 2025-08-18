@@ -45,7 +45,7 @@ namespace PLCDataCollector.Model.Classes
 
         public decimal Efficiency { get; set; }
 
-        public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+        public DateTime Timestamp { get; set; } = DateTime.Now;
 
         // Navigation properties
         public LineDetail LineDetail { get; set; }

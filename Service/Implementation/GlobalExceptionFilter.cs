@@ -19,7 +19,7 @@ namespace PLCDataCollector.Service.Implementation
             var result = new ObjectResult(new
             {
                 error = "An error occurred while processing your request",
-                timestamp = DateTime.UtcNow,
+                timestamp = DateTime.Now,
                 path = context.HttpContext.Request.Path
             })
             {
