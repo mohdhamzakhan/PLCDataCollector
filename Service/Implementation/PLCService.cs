@@ -1,5 +1,11 @@
-﻿using PLCDataCollector.Model.Classes;
+﻿using CsvHelper;
+using FluentFTP;
+using Newtonsoft.Json;
+using PLCDataCollector.Model.Classes;
 using PLCDataCollector.Service.Interfaces;
+using System.Globalization;
+using System.Net;
+using System.Text.Json;
 
 namespace PLCDataCollector.Service.Implementation
 {
@@ -25,7 +31,7 @@ namespace PLCDataCollector.Service.Implementation
                 }
 
                 // Read from PLC (FTP in this case)
-                var rawData = await ReadFromFTPAsync(lineDetail.PLCConfig);
+                var rawData = await ReadFromFTPAsync(lineDetail.PLC);
 
                 return new PLCData
                 {
@@ -66,54 +72,154 @@ namespace PLCDataCollector.Service.Implementation
 
         private async Task<Dictionary<string, object>> ReadFromFTPAsync(PLCConfig plcConfig)
         {
+            var result = new Dictionary<string, object>();
+
             try
             {
-                // Simulate FTP read - replace with actual FTP implementation
-                await Task.Delay(100); // Simulate network delay
-
-                // Generate sample data based on current time for demonstration
-                var random = new Random();
-                return new Dictionary<string, object>
+                if (plcConfig != null)
                 {
-                    ["ProductionCount"] = random.Next(1, 1000),
-                    ["PartNumber"] = $"PART{random.Next(1000, 9999)}",
-                    ["CycleTime"] = random.Next(10, 30),
-                    ["Status"] = random.Next(0, 2), // 0 = stopped, 1 = running
-                    ["Timestamp"] = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
-                };
+                    var client = new FtpClient(plcConfig.IP, new NetworkCredential(plcConfig.Username, plcConfig.Password));
+                    client.Port = int.Parse(plcConfig.Port);
+                    client.Connect();
+
+                    using (var stream = new MemoryStream())
+                    {
+                        bool success = client.DownloadStream(stream, plcConfig.FilePath);
+                        if (!success)
+                            throw new Exception("Failed to download FTP file.");
+
+                        stream.Position = 0;
+                        using var reader = new StreamReader(stream);
+                        var fileContent = await reader.ReadToEndAsync();
+
+                        using var csvReader = new CsvReader(new StringReader(fileContent), CultureInfo.InvariantCulture);
+                        
+
+                        // SKIP the configured number of lines before processing
+                        for (int i = 0; i < plcConfig.SkipLine; i++)
+                        {
+                            await csvReader.ReadAsync();
+                        }
+                        await csvReader.ReadAsync();
+                        csvReader.ReadHeader();
+
+                        int rowIndex = 0;
+                        while (await csvReader.ReadAsync())
+                        {
+                            var row = new Dictionary<string, string>();
+                            foreach (var header in csvReader.HeaderRecord)
+                                row[header] = csvReader.GetField(header);
+
+                            string jsonString = System.Text.Json.JsonSerializer.Serialize(row);
+                            result.Add(rowIndex.ToString(), jsonString);
+                            rowIndex++;
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to read from FTP for PLC {IpAddress}", plcConfig.IP);
                 throw;
             }
+
+            return result;
         }
 
-        private int ExtractCount(Dictionary<string, object> rawData, string location)
+
+        private int ExtractCount(Dictionary<string, object> rawData, DataLocationConfig dataLocation)
         {
-            if (rawData.TryGetValue("ProductionCount", out var count))
+            try
             {
-                return Convert.ToInt32(count);
+                // Use the dataLocation properties to extract count
+                // Example: if count is at a specific position/offset
+                if (rawData.ContainsKey("ProductionCount"))
+                {
+                    return Convert.ToInt32(rawData["ProductionCount"]);
+                }
+
+                // If you're extracting from a string at specific positions:
+                if (rawData.ContainsKey("DataString"))
+                {
+                    var dataString = rawData["DataString"].ToString();
+                    // Use dataLocation.Part or other properties to determine position
+                    var startPos = dataLocation.Part; // or whatever logic you need
+                    var length = dataLocation.Lenght; // or specific length for count
+
+                    if (dataString.Length > startPos + length)
+                    {
+                        var countStr = dataString.Substring(startPos, length);
+                        return int.TryParse(countStr.Trim(), out var count) ? count : 0;
+                    }
+                }
+
+                return 0;
             }
-            return 0;
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error extracting count from raw data");
+                return 0;
+            }
         }
 
-        private string ExtractPartNumber(Dictionary<string, object> rawData, string location)
+        private string ExtractPartNumber(Dictionary<string, object> rawData, DataLocationConfig dataLocation)
         {
-            if (rawData.TryGetValue("PartNumber", out var partNumber))
+            
+            try
             {
-                return partNumber.ToString();
+                if (rawData.TryGetValue("0", out var entryObj) && entryObj is string jsonString)
+                {
+                    // Deserialize to Dictionary<string, object>
+                    var dict = JsonConvert.DeserializeObject<Dictionary<string, object>>(jsonString);
+                    if (dict.TryGetValue("QR", out var qr) && qr != null)
+                        return qr.ToString().Trim();
+
+                    // Optional: check P2_Type as alternative
+                    if (dict.TryGetValue("PartNumber", out var partNum) && partNum != null)
+                        return partNum.ToString().Trim();
+                }
+
+                return string.Empty;
             }
-            return "UNKNOWN";
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error extracting part number from raw data");
+                return string.Empty;
+            }
         }
 
-        private int ExtractCycleTime(Dictionary<string, object> rawData, string location)
+        private int ExtractCycleTime(Dictionary<string, object> rawData, DataLocationConfig dataLocation)
         {
-            if (rawData.TryGetValue("CycleTime", out var cycleTime))
+            try
             {
-                return Convert.ToInt32(cycleTime);
+                // Use the dataLocation properties to extract cycle time
+                if (rawData.ContainsKey("CycleTime"))
+                {
+                    return Convert.ToInt32(rawData["CycleTime"]);
+                }
+
+                // If you're extracting from a string at specific positions:
+                if (rawData.ContainsKey("DataString"))
+                {
+                    var dataString = rawData["DataString"].ToString();
+                    // Use dataLocation.Time to determine position
+                    var startPos = dataLocation.Time;
+                    var length = 5; // or use another property from dataLocation
+
+                    if (dataString.Length > startPos + length)
+                    {
+                        var cycleTimeStr = dataString.Substring(startPos, length);
+                        return int.TryParse(cycleTimeStr.Trim(), out var cycleTime) ? cycleTime : 0;
+                    }
+                }
+
+                return 0;
             }
-            return 0; // Default from configuration
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Error extracting cycle time from raw data");
+                return 0;
+            }
         }
 
         private bool DetermineRunningStatus(Dictionary<string, object> rawData)

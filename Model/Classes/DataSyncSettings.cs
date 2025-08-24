@@ -1,5 +1,6 @@
 ﻿namespace PLCDataCollector.Model.Classes
 {
+    // Add DataSyncSettings if not already defined elsewhere
     public class DataSyncSettings
     {
         public int IntervalSeconds { get; set; } = 30;

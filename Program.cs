@@ -42,6 +42,7 @@ try
 
     // Add Swagger/OpenAPI
     builder.Services.AddEndpointsApiExplorer();
+
     builder.Services.AddSwaggerGen(c =>
     {
         c.SwaggerDoc("v1", new OpenApiInfo
@@ -172,6 +173,8 @@ try
                                     ?? "Data Source=plc_target.db";
         return new SqliteContext(sqliteConnectionString);
     });
+    builder.Services.Configure<DataSyncSettings>(
+    builder.Configuration.GetSection("DataSync"));
 
     // Register your services (make sure all interfaces have implementations)
     builder.Services.AddSingleton<IConfigurationService, ConfigurationService>();
@@ -184,6 +187,7 @@ try
     builder.Services.AddSingleton<IWebSocketService, WebSocketService>();
     builder.Services.AddScoped<IPlcDataService, PlcDataService>();
     builder.Services.AddScoped<PlcDataValidator>();
+    builder.Services.AddSingleton<IDataSyncMonitor, DataSyncMonitor>();
 
     // Add background services
     builder.Services.AddHostedService<PLCDataCollectorBackgroundService>();
@@ -207,6 +211,34 @@ try
     });
 
     var app = builder.Build();
+
+    using (var scope = app.Services.CreateScope())
+    {
+        var configService = scope.ServiceProvider.GetRequiredService<IConfigurationService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+        try
+        {
+            var appSettings = configService.GetAppSettings();
+            logger.LogInformation("Configuration loaded successfully");
+            logger.LogInformation("Line Details Count: {Count}", appSettings.LineDetails?.Count ?? 0);
+
+            // Test specific line detail
+            var egrvLine = configService.GetLineDetail("EGRV_Final");
+            if (egrvLine != null)
+            {
+                logger.LogInformation("EGRV_Final line loaded: {LineName}", egrvLine.LineName);
+            }
+            else
+            {
+                logger.LogWarning("EGRV_Final line not found in configuration");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load configuration");
+        }
+    }
 
     // Configure the HTTP request pipeline
     if (app.Environment.IsDevelopment())
@@ -344,6 +376,11 @@ try
     {
         Predicate = _ => false,
     });
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseDeveloperExceptionPage();
+    }
+
 
     app.MapControllers();
 

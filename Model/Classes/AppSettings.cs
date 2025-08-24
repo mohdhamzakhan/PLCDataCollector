@@ -1,5 +1,6 @@
 ﻿using Azure;
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Configuration;
 
 namespace PLCDataCollector.Model.Classes
@@ -11,6 +12,8 @@ namespace PLCDataCollector.Model.Classes
         public Serilog Serilog { get; set; } = new();
         public RealTimeSettings RealTimeSettings { get; set; } = new();
         public ConnectionStrings ConnectionStrings { get; set; } = new();
+        public DatabaseSettings DatabaseSettings { get; set; } = new();
+        public DataSyncSettings DataSync { get; set; } = new();
         public Dictionary<string, LineDetail> LineDetails { get; set; } = new();
         public string AllowedHosts { get; set; } = "*";
     }
@@ -63,12 +66,34 @@ namespace PLCDataCollector.Model.Classes
         public int AheadSchedule { get; set; } = 10;
     }
 
+    // Updated ConnectionStrings to match JSON structure
     public class ConnectionStrings
     {
+        public EnvironmentConnectionStrings SourceDatabase { get; set; } = new();
+        public EnvironmentConnectionStrings TargetDatabase { get; set; } = new();
+
+        // Keep backward compatibility
         public string Temporary { get; set; }
         public string Production { get; set; }
     }
 
+    public class EnvironmentConnectionStrings
+    {
+        public string Development { get; set; }
+        public string Production { get; set; }
+    }
+
+    // Add DatabaseSettings class
+    public class DatabaseSettings
+    {
+        public EnvironmentDatabaseType SourceType { get; set; } = new();
+    }
+
+    public class EnvironmentDatabaseType
+    {
+        public string Development { get; set; } = "SQLite";
+        public string Production { get; set; } = "Oracle";
+    }
 
     public class ConfigurationSetting
     {
@@ -137,27 +162,36 @@ namespace PLCDataCollector.Model.Classes
 
     public class PLCConfig
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int ID { get; set; }
         public string FTP { get; set; }
         public string IP { get; set; }
         public string Port { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
         public string FilePath { get; set; }
+        public int CycleTime { get; set; }
+        public int SkipLine { get; set; }
     }
 
     public class DataLocationConfig
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int ID { get; set; }
         public int Lenght { get; set; }
         public int Justifation { get; set; }
         public int Part { get; set; }
         public int Time { get; set; }
         public int Part_Number { get; set; }
-
-        public virtual LineDetail LineDetail { get; set; }
     }
 
     public class ShiftConfigurationDetail
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int ID { get; set; }
         public ShiftDetail ShiftA { get; set; } = new();
         public ShiftDetail ShiftB { get; set; } = new();
         public ShiftDetail ShiftC { get; set; } = new();
@@ -167,6 +201,9 @@ namespace PLCDataCollector.Model.Classes
 
     public class ShiftDetail
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int ID { get; set; }
         public string Name { get; set; }
         public string StartTime { get; set; }
         public string EndTime { get; set; }
@@ -176,6 +213,9 @@ namespace PLCDataCollector.Model.Classes
 
     public class LineGraphSettings
     {
+        [Key]
+        [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+        public int ID { get; set; }
         public int RefreshInterval { get; set; } = 5000;
         public bool ShowCurrentTime { get; set; } = true;
         public string CurrentTimeColor { get; set; } = "#FF0000";

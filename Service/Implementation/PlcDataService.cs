@@ -7,12 +7,12 @@ namespace PLCDataCollector.Service.Implementation
     public class PlcDataService : IPlcDataService
     {
         private readonly IDatabaseContext _sourceDb;
-        private readonly IDatabaseContext _targetDb;
+        private readonly ITargetDatabaseContext _targetDb;
         private readonly ILogger<PlcDataService> _logger;
 
         public PlcDataService(
             IDatabaseContext sourceDb,
-            IDatabaseContext targetDb,
+            ITargetDatabaseContext targetDb,
             ILogger<PlcDataService> logger)
         {
             _sourceDb = sourceDb;
@@ -24,7 +24,7 @@ namespace PLCDataCollector.Service.Implementation
         {
             try
             {
-                using var conn = _sourceDb.CreateConnection();
+                using var conn = _targetDb.CreateConnection();
                 conn.Open();
 
                 const string sql = @"
@@ -52,7 +52,7 @@ namespace PLCDataCollector.Service.Implementation
         {
             try
             {
-                using var conn = _sourceDb.CreateConnection();
+                using var conn = _targetDb.CreateConnection();
                 conn.Open();
 
                 const string sql = @"
@@ -74,7 +74,7 @@ namespace PLCDataCollector.Service.Implementation
         {
             try
             {
-                using var conn = _sourceDb.CreateConnection();
+                using var conn = _targetDb.CreateConnection();
                 conn.Open();
 
                 const string sql = @"

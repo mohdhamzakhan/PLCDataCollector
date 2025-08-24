@@ -16,17 +16,27 @@ namespace PLCDataCollector.Model.Classes
         public DateTime CreatedAt { get; set; }
         public DateTime UpdatedAt { get; set; }
 
+        // Updated to match JSON structure
         [Required]
-        public string Data_Location { get; set; }
+        public DataLocationConfig Data_Location { get; set; }
 
-        [Required]
-        public string PLC { get; set; }
+        // Option 2: Add separate property for configuration object binding
+        [NotMapped]
+        public DataLocationConfig DataLocationConfig { get; set; }
+
+        // Updated to match JSON structure
+        public PLCConfig PLC { get; set; }
 
         [Required]
         public ShiftConfigurationDetail ShiftConfiguration { get; set; }
 
+        // Add GraphSettings to match JSON
+        public LineGraphSettings GraphSettings { get; set; }
+
+        // Keep backward compatibility - not mapped to database
         [NotMapped]
         public PLCConfig PLCConfig { get; set; }
+        
         public virtual ICollection<PlcData> PlcData { get; set; } = new List<PlcData>();
         public virtual ICollection<ConfigurationSetting> ConfigurationSettings { get; set; } = new List<ConfigurationSetting>();
         public virtual ICollection<Tag> Tags { get; set; } = new List<Tag>();

@@ -24,4 +24,14 @@ namespace PLCDataCollector.Model.Classes
         public DateTime Timestamp { get; set; }
         public virtual LineDetail LineDetail { get; set; }
     }
+
+    public class targetPLCData
+    {
+        [Required]
+        public long Id { get; set; }
+        public string LineId { get; set; }
+        public string Data { get; set; }      // Store serialized JSON here
+        public long? SyncStatus { get; set; }
+        public DateTime? Timestamp { get; set; }
+    }
 }

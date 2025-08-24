@@ -168,6 +168,9 @@ namespace PLCDataCollector.Model.Classes
                 .WithMany(l => l.MaintenanceLogs)
                 .HasForeignKey(m => m.LineId)
                 .HasPrincipalKey(l => l.LineId);
+
+            modelBuilder.Entity<DataLocationConfig>()
+                .HasKey(d => d.ID);
         }
     }
 }
