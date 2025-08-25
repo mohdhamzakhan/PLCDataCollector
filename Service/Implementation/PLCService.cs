@@ -1,10 +1,14 @@
 ﻿using CsvHelper;
 using FluentFTP;
+using Modbus;
+using Modbus.Device;
 using Newtonsoft.Json;
 using PLCDataCollector.Model.Classes;
 using PLCDataCollector.Service.Interfaces;
 using System.Globalization;
 using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using System.Text.Json;
 
 namespace PLCDataCollector.Service.Implementation
@@ -78,42 +82,67 @@ namespace PLCDataCollector.Service.Implementation
             {
                 if (plcConfig != null)
                 {
-                    var client = new FtpClient(plcConfig.IP, new NetworkCredential(plcConfig.Username, plcConfig.Password));
-                    client.Port = int.Parse(plcConfig.Port);
-                    client.Connect();
-
-                    using (var stream = new MemoryStream())
+                    if (plcConfig.FTP.ToLower().Contains("ftp"))
                     {
-                        bool success = client.DownloadStream(stream, plcConfig.FilePath);
-                        if (!success)
-                            throw new Exception("Failed to download FTP file.");
+                        var client = new FtpClient(plcConfig.IP, new NetworkCredential(plcConfig.Username, plcConfig.Password));
+                        client.Port = int.Parse(plcConfig.Port);
+                        client.Connect();
 
-                        stream.Position = 0;
-                        using var reader = new StreamReader(stream);
-                        var fileContent = await reader.ReadToEndAsync();
-
-                        using var csvReader = new CsvReader(new StringReader(fileContent), CultureInfo.InvariantCulture);
-                        
-
-                        // SKIP the configured number of lines before processing
-                        for (int i = 0; i < plcConfig.SkipLine; i++)
+                        using (var stream = new MemoryStream())
                         {
+                            bool success = client.DownloadStream(stream, plcConfig.FilePath);
+                            if (!success)
+                                throw new Exception("Failed to download FTP file.");
+
+                            stream.Position = 0;
+                            using var reader = new StreamReader(stream);
+                            var fileContent = await reader.ReadToEndAsync();
+
+                            using var csvReader = new CsvReader(new StringReader(fileContent), CultureInfo.InvariantCulture);
+
+
+                            // SKIP the configured number of lines before processing
+                            for (int i = 0; i < plcConfig.SkipLine; i++)
+                            {
+                                await csvReader.ReadAsync();
+                            }
                             await csvReader.ReadAsync();
-                        }
-                        await csvReader.ReadAsync();
-                        csvReader.ReadHeader();
+                            csvReader.ReadHeader();
 
-                        int rowIndex = 0;
-                        while (await csvReader.ReadAsync())
+                            int rowIndex = 0;
+                            while (await csvReader.ReadAsync())
+                            {
+                                var row = new Dictionary<string, string>();
+                                foreach (var header in csvReader.HeaderRecord)
+                                    row[header] = csvReader.GetField(header);
+
+                                string jsonString = System.Text.Json.JsonSerializer.Serialize(row);
+                                result.Add(rowIndex.ToString(), jsonString);
+                                rowIndex++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        using (var client = new TcpClient(plcConfig.IP, Int32.Parse(plcConfig.Port)))
                         {
-                            var row = new Dictionary<string, string>();
-                            foreach (var header in csvReader.HeaderRecord)
-                                row[header] = csvReader.GetField(header);
+                            byte slaveId = 1;
+                            var master = ModbusIpMaster.CreateIp(client);
 
-                            string jsonString = System.Text.Json.JsonSerializer.Serialize(row);
-                            result.Add(rowIndex.ToString(), jsonString);
-                            rowIndex++;
+                            Console.WriteLine("✅ Connected to PLC via Modbus TCP");
+
+                            // 📥 Read 5 holding registers starting at address 0
+                            ushort startAddress = 0;
+                            ushort numRegisters = 5;
+                            ushort[] registers = master.ReadHoldingRegisters(slaveId, startAddress, numRegisters);
+
+                            Console.WriteLine("Register values:");
+                            for (int i = 0; i < registers.Length; i++)
+                            {
+                                Console.WriteLine($"Address {startAddress + i}: {registers[i]}");
+                            }
                         }
+
                     }
                 }
             }
@@ -164,7 +193,7 @@ namespace PLCDataCollector.Service.Implementation
 
         private string ExtractPartNumber(Dictionary<string, object> rawData, DataLocationConfig dataLocation)
         {
-            
+
             try
             {
                 if (rawData.TryGetValue("0", out var entryObj) && entryObj is string jsonString)
